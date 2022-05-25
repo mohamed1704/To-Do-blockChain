@@ -298,8 +298,8 @@ app.post('/newTask', async (req, res) => {
     );
   }
 });
-
-app.listen(3000);
+const port = process.env.PORT || 9002;
+app.listen(port, () => console.log('port ${port}'));
 
 
 // addition notes:
