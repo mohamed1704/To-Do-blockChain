@@ -1,0 +1,238 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ToDo {
+  
+  struct Task {
+    uint id;
+    string title;
+    string description;
+    address owner;
+    uint reward;
+    address winner;
+    bool done;
+    uint dateComplete;
+    bool fineshed;
+  }
+
+  struct User {
+    uint id;
+    address purse;
+    uint coins;
+  }
+
+  uint lastTaskId;
+   uint  lastUserId;
+   bool isUserExist;
+   uint  TDO;
+  uint[] taskIds;
+  mapping(uint => Task) tasks;
+  mapping(uint => User)  users;
+
+  event UserAdded(
+    uint id,
+    address user,
+    uint coins
+  );
+
+  event TaskCreated(
+     uint id,
+    string title,
+    string description,
+    address owner,
+    uint reward,
+    address winner,
+    bool done,
+    uint dateComplete,
+    bool fineshed
+  );
+
+  event TaskStatusToggled(
+    uint id, 
+    bool done, 
+    uint date
+  );
+
+  event TaskStatusFineshed(
+    uint id, 
+    bool finesh
+  );
+
+modifier onlyNewUser(address user) {
+    for(uint i = 0; i < lastUserId; i++) {
+     if (users[i].purse == user) revert();
+     }
+_;
+    
+}
+
+   constructor() {
+    lastTaskId = 1;
+    lastUserId = 1;
+    TDO = 10000000000;
+    isUserExist = false;
+  }
+
+  function createTask(
+    string calldata _title, 
+    string calldata _description, 
+    uint  _reward) 
+    userExists() external  {
+      require(_reward > 49);
+    for(uint i = 0; i < lastUserId; i++) {
+      if(users[i].purse == msg.sender ){ 
+        users[i].coins = users[i].coins - _reward;
+        tasks[lastTaskId] = Task(lastTaskId,
+                                   _title, 
+                                   _description, 
+                                   msg.sender,
+                                   _reward,
+                                   address(0), 
+                                   false, 
+                                   0, 
+                                   false);
+        taskIds.push(lastTaskId);
+        lastTaskId++;
+      }
+    }
+   emit TaskCreated(lastTaskId, _title, _description, msg.sender, _reward, address(0), false, 0, false);
+  }
+
+  function newUser(address _user)external
+    onlyNewUser(_user)
+    {
+    require(TDO >= 1000);
+    TDO = TDO - 1000;
+    uint  _coins = 1000;
+    users[lastUserId] = User(lastUserId, _user, _coins);
+    taskIds.push(lastUserId);
+    lastUserId++;
+   emit UserAdded(lastUserId, _user, _coins);
+  }
+
+  function getTask(uint id) taskExists(id) external 
+    view returns(uint, string memory, string memory, address,
+      address,   uint, bool, uint, bool) {
+        Task memory task = tasks[id];
+    return(
+      id, task.title, task.description, task.owner, task.winner,
+       task.reward, task.done, task.dateComplete, task.fineshed);
+  }
+
+
+  function getUser(uint _id) external
+    view returns(uint, address, uint ) {
+      //require(isUserExist);
+      User memory user = users[_id];
+
+    return(user.id, user.purse, user.coins);
+  }
+
+  modifier taskExists(uint id) {
+    if(tasks[id].id == 0) {
+      revert();
+     }
+    _;
+  }
+
+  modifier userExists() {
+    for(uint i = 0; i < lastUserId; i++) {
+      if(users[i].purse == msg.sender){ isUserExist = true; }
+    }
+    if(!isUserExist){ revert(); }
+    _;
+  }
+
+  function toggleDone(uint id) 
+    external taskExists(id) {
+    Task storage task = tasks[id];
+    require(!task.done);
+    task.done = !task.done;
+    task.winner = msg.sender;
+    task.dateComplete = task.done ? block.timestamp : 0;
+    emit TaskStatusToggled(id, task.done, task.dateComplete);
+  }
+
+  function toggleFinesh(uint id) 
+    external taskExists(id) {
+    Task storage task = tasks[id];
+    require(task.done);
+    require(msg.sender == task.owner);
+    for(uint i = 0; i < lastUserId; i++) {
+      if(users[i].purse == task.winner){ 
+        users[i].coins = users[i].coins + task.reward;
+        task.reward = 0;
+        task.fineshed = !task.fineshed;
+        }
+    }
+    
+    emit TaskStatusFineshed(id, task.fineshed);
+  }
+
+  function getTasksUnComplete()
+     external view 
+     returns (Task[] memory) {
+        uint  localCounter = 0;
+       uint  _myTasksSize = 0;
+    Task[] memory _tasks = new Task[](lastTaskId);
+    for(uint i = 0; i < lastTaskId; i++) {
+      if(!tasks[i].done && tasks[i].owner != address(0)){
+        _tasks[i] = tasks[i];
+        _myTasksSize++;
+        }
+    }
+    Task[] memory _myTasks = new Task[](_myTasksSize);
+    for(uint i = 0; i < lastTaskId; i++) {
+      if(_tasks[i].id != 0){
+        _myTasks[localCounter] = _tasks[i];
+        localCounter++;
+        }
+    }
+    return _myTasks;
+  }
+
+  function getTasksUnFinesh()
+     external view 
+     returns (Task[] memory) {
+        uint  localCounter = 0;
+       uint  _myTasksSize = 0;
+    Task[] memory _tasks = new Task[](lastTaskId);
+    for(uint i = 0; i < lastTaskId; i++) {
+      if(tasks[i].done && tasks[i].owner == msg.sender && !tasks[i].fineshed){
+        _tasks[i] = tasks[i];
+        _myTasksSize++;
+        }
+    }
+    Task[] memory _myTasks = new Task[](_myTasksSize);
+    for(uint i = 0; i < lastTaskId; i++) {
+      if(_tasks[i].id != 0){
+        _myTasks[localCounter] = _tasks[i];
+        localCounter++;
+        }
+    }
+    return _myTasks;
+  }
+
+  function getMyActions()
+     external view 
+     returns (Task[] memory) {
+       uint  localCounter = 0;
+       uint  _myTasksSize = 0;
+    Task[] memory _tasks = new Task[](lastTaskId);
+    for(uint i = 0; i < lastTaskId; i++) {
+      if(tasks[i].winner == msg.sender || tasks[i].owner == msg.sender){
+        _tasks[i] = tasks[i];
+        _myTasksSize++;
+        }
+    }
+    Task[] memory _myTasks = new Task[](_myTasksSize);
+    for(uint i = 0; i < lastTaskId; i++) {
+      if(_tasks[i].id != 0){
+        _myTasks[localCounter] = _tasks[i];
+        localCounter++;
+        }
+    }
+    return _myTasks;
+  }
+
+}
